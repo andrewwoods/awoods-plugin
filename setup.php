@@ -7,6 +7,6 @@
  */ 
 
 if ( defined( 'WP_CLI' ) && WP_CLI ) {
-	require_once dirname( __FILE__ ) . '/lib/wpcli-awoods.php';
+	require_once dirname( __FILE__ ) . '/lib/wpcli/awoods.php';
 }
 
