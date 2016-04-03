@@ -35,6 +35,24 @@ class Awoods_Command extends WP_CLI_Command {
 		$this->current_wpcli_version();
 	}
 
+
+	/**
+	 * Prints a list of active plugins
+	 *
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp awoods active-plugins
+	 *
+	 * @subcommand active-plugins
+	 *
+	 * @when before_wp_load
+	 */
+	function active_plugins( $args, $assoc_args ) {
+		$this->list_active_plugins();
+	}
+
+
 	/**
 	 * Display a list of the active plugins
 	 *
