@@ -69,6 +69,26 @@ class Awoods_Command extends WP_CLI_Command {
 	} 
 
 
+
+	/**
+	 * Prints the current theme.
+	 *
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp awoods active-theme
+	 *
+	 * @subcommand active-theme
+	 *
+	 * @when before_wp_load
+	 */
+	function active_theme( $args, $assoc_args ) {
+		$this->list_active_theme();
+	}
+
+
+
+
 	/**
 	 * Display a liist of the active theme
 	 *
