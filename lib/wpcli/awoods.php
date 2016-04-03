@@ -6,16 +6,16 @@ class Awoods_Command extends WP_CLI_Command {
 
 
 	/**
-	 * Prints a summary of the wordpress setup.
+	 * Prints a summary of the current wordpress site.
 	 *
 	 *
 	 * ## EXAMPLES
 	 *
-	 *     wp awoods audit Newman
+	 *     wp awoods summary
 	 *
 	 * @when before_wp_load
 	 */
-	function audit( $args, $assoc_args ) {
+	function summary( $args, $assoc_args ) {
 
 		$this->current_wordpress_version();
 
