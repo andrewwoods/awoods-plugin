@@ -136,6 +136,153 @@ class Awoods_Command extends WP_CLI_Command {
 	} 
 
 
+	/**
+	 * Create a theme based on Temperance
+	 *
+	 * ## OPTIONS
+	 *
+	 * <slug>
+	 * : The slug of the new theme.
+	 *
+	 * [--activate]
+	 * : Activate the newly created theme.
+	 *
+	 * [--enable-network]
+	 * : Enable the newly downloaded theme for the entire network.
+	 *
+	 * [--theme_name=<title>]
+	 * : What to put in the 'Theme Name:' header in style.css
+	 *
+	 * [--author=<full-name>]
+	 * : What to put in the 'Author:' header in style.css
+	 *
+	 * [--author_uri=<uri>]
+	 * : What to put in the 'Author URI:' header in style.css
+	 *
+	 *
+	 * [--force]
+	 * : Overwrite files that already exist.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp awoods temperance <slug>
+	 *
+	 * @when before_wp_load
+	 */
+	function temperance( $args, $assoc_args ) {
+		list( $theme_slug ) = $args;
+
+		// https://github.com/andrewwoods/temperance/archive/master.zip
+		// gets redirected to here
+		$gh_url='https://codeload.github.com/andrewwoods/temperance/zip/master';
+
+		WP_CLI::debug( "gh_url=$gh_url" );
+
+		$theme_path = WP_CONTENT_DIR . "/themes";
+		$url        = $gh_url;
+		$timeout    = 30;
+		$data = wp_parse_args( $assoc_args, array(
+			'theme_name' => ucfirst( $theme_slug ),
+			'author'     => "Me",
+			'author_uri' => "",
+		) );
+
+		$theme_description = $data['theme_name']
+			. ", developed by " . $data['author'];
+
+		$new_theme_path = "$theme_path/$theme_slug";
+		WP_CLI::debug( "new_theme_path=$new_theme_path" );
+
+		$temperance_master_path = "$theme_path/temperance-master";
+		WP_CLI::debug( "temperance_master_path=$temperance_master_path" );
+
+		$force = \WP_CLI\Utils\get_flag_value( $data, 'force' );
+		$should_write_file = $this->prompt_if_files_will_be_overwritten( $new_theme_path, $force );
+
+		if ( ! $should_write_file ) {
+			WP_CLI::log( 'No files created' );
+			die;
+		}
+
+
+		$theme                               = array();
+		$theme['temperance_name']            = $data['theme_name'];
+		$theme['temperance_slug']            = $theme_slug;
+		$theme['temperance_author']          = $data['author'];
+		$theme['temperance_author_uri']      = $data['author_uri'];
+		$theme['temperance_description']     = $theme_description;
+		$theme['temperance_generate']        = "1";
+
+
+		$tmpfname = wp_tempnam( $url . '.zip' );
+		WP_CLI::debug('tmpfname=' . $tmpfname);
+		$response = wp_remote_post( $url, array(
+			'timeout'  => $timeout,
+			'stream'   => true,
+			'redirection' => 5,
+			'filename'    => $tmpfname
+		) );
+
+		if ( is_wp_error( $response ) ) {
+			WP_CLI::error( $response );
+		}
+
+		$response_code = wp_remote_retrieve_response_code( $response );
+		if ( 200 != $response_code ) {
+			WP_CLI::error( "Couldn't create theme (received $response_code response)." );
+		}
+
+		$this->maybe_create_themes_dir();
+		$this->init_wp_filesystem();
+		$unzip_result = unzip_file( $tmpfname, $theme_path );
+		unlink( $tmpfname );
+		rename( $temperance_master_path, $new_theme_path );
+
+
+
+		if ( true === $unzip_result ) {
+			WP_CLI::success( "Created theme '{$data['theme_name']}'." );
+		} else {
+			WP_CLI::error( "Could not decompress your theme files ('{$tmpfname}') at '{$theme_path}': {$unzip_result->get_error_message()}" );
+		}
+
+		if ( \WP_CLI\Utils\get_flag_value( $assoc_args, 'activate' ) ) {
+			WP_CLI::run_command( array( 'theme', 'activate', $theme_slug ) );
+		} else if ( \WP_CLI\Utils\get_flag_value( $assoc_args, 'enable-network' ) ) {
+			WP_CLI::run_command( array( 'theme', 'enable', $theme_slug ), array( 'network' => true ) );
+		}
+
+	}
+
+
+	/**
+	 * Prompt to override existing assets.
+	 *
+	 * @param string $filename path
+	 * @param bool $force an optional value
+	 * @return void
+	 */
+	private function prompt_if_files_will_be_overwritten( $filename, $force ) {
+		$should_write_file = true;
+		if ( ! file_exists( $filename ) ) {
+			return true;
+		}
+		WP_CLI::warning( 'File already exists' );
+		WP_CLI::log( $filename );
+		if ( ! $force ) {
+			do {
+				$answer = cli\prompt(
+					'Skip this file, or replace it with scaffolding?',
+					$default = false,
+					$marker = '[s/r]: '
+				);
+			} while ( ! in_array( $answer, array( 's', 'r' ) ) );
+			$should_write_file = 'r' === $answer;
+		}
+		$outcome = $should_write_file ? 'Replacing' : 'Skipping';
+		WP_CLI::log( $outcome . PHP_EOL );
+		return $should_write_file;
+	}
 
 
 
@@ -167,6 +314,28 @@ class Awoods_Command extends WP_CLI_Command {
 		WP_CLI::run_command( $args, $assoc_args );
 		echo "\n";
 	} 
+
+	/**
+	 * Create the themes directory if it doesn't already exist
+	 */
+	protected function maybe_create_themes_dir() {
+		$themes_dir = WP_CONTENT_DIR . '/themes';
+		if ( ! is_dir( $themes_dir ) ) {
+			wp_mkdir_p( $themes_dir );
+		}
+	}
+
+
+	/**
+	 * Initialize WP Filesystem
+	 */
+	private function init_wp_filesystem() {
+		global $wp_filesystem;
+		WP_Filesystem();
+		return $wp_filesystem;
+	}
+
+
 
 
 	/**
