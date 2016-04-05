@@ -153,12 +153,14 @@ class Awoods_Command extends WP_CLI_Command {
 	 * [--theme_name=<title>]
 	 * : What to put in the 'Theme Name:' header in style.css
 	 *
-	 * [--author=<full-name>]
+	 * [--theme_uri=<url>]
+	 * : What to put in the 'Theme URI:' header in style.css
+	 *
+	 * [--author_name=<full-name>]
 	 * : What to put in the 'Author:' header in style.css
 	 *
-	 * [--author_uri=<uri>]
+	 * [--author_uri=<url>]
 	 * : What to put in the 'Author URI:' header in style.css
-	 *
 	 *
 	 * [--force]
 	 * : Overwrite files that already exist.
@@ -182,13 +184,17 @@ class Awoods_Command extends WP_CLI_Command {
 		$url        = $gh_url;
 		$timeout    = 30;
 		$data = wp_parse_args( $assoc_args, array(
-			'theme_name' => ucfirst( $theme_slug ),
-			'author'     => "Me",
-			'author_uri' => "",
+			'theme_name'  => ucfirst( $theme_slug ),
+			'theme_uri'   => 'http://theme-site.example.com',
+			'author_name' => 'Firstname Lastname',
+			'author_uri'  => 'http://author-site.example.com',
 		) );
 
-		$theme_description = $data['theme_name']
-			. ", developed by " . $data['author'];
+		$data['description'] = $data['theme_name'] . ", developed by " . $data['author'];
+		$data['slug']        = $theme_slug;
+		$data['text_domain'] = $slug . 'theme';
+		$data['prefix']      = $slug . '_';
+
 
 		$new_theme_path = "$theme_path/$theme_slug";
 		WP_CLI::debug( "new_theme_path=$new_theme_path" );
@@ -205,13 +211,6 @@ class Awoods_Command extends WP_CLI_Command {
 		}
 
 
-		$theme                               = array();
-		$theme['temperance_name']            = $data['theme_name'];
-		$theme['temperance_slug']            = $theme_slug;
-		$theme['temperance_author']          = $data['author'];
-		$theme['temperance_author_uri']      = $data['author_uri'];
-		$theme['temperance_description']     = $theme_description;
-		$theme['temperance_generate']        = "1";
 
 
 		$tmpfname = wp_tempnam( $url . '.zip' );
@@ -246,6 +245,20 @@ class Awoods_Command extends WP_CLI_Command {
 			WP_CLI::error( "Could not decompress your theme files ('{$tmpfname}') at '{$theme_path}': {$unzip_result->get_error_message()}" );
 		}
 
+		WP_CLI::debug( print_r( $data, true) );
+
+		$replacements = array();
+		$replacements['temperance']                      = $data['slug'];
+		$replacements['temperancetheme']                 = $data['text_domain'];
+		$replacements['YOUR_THEME_NAME']                 = $data['theme_name'];
+		$replacements['AUTHOR_NAME']                     = $data['author_name'];
+		$replacements['http://AUTHOR-URI.example.com/']  = $data['author_uri'];
+		$replacements['http://THEME-URI.example.com/']   = $data['theme_uri'];
+
+		WP_CLI::warning('About to Search and Replace');
+		$this->search_replace_text( $new_theme_path, $replacements );
+
+
 		if ( \WP_CLI\Utils\get_flag_value( $assoc_args, 'activate' ) ) {
 			WP_CLI::run_command( array( 'theme', 'activate', $theme_slug ) );
 		} else if ( \WP_CLI\Utils\get_flag_value( $assoc_args, 'enable-network' ) ) {
@@ -254,6 +267,35 @@ class Awoods_Command extends WP_CLI_Command {
 
 	}
 
+	/**
+	 * Search/Replace multiple text in files within the folder
+	 *
+	 * @param string $dir_path
+	 * @param array $data
+	 * @return void
+	 */
+	protected function search_replace_text( $dir_path, $data ) {
+		WP_CLI::debug('dir_path=' . $dir_path );
+		WP_CLI::debug('data=' . print_r( $data, true ) );
+
+		// Find all the files in the directory
+		$glob_path = $dir_path . '/*.*';
+
+		WP_CLI::debug('glob path=' . $glob_path );
+
+		foreach ( glob("$glob_path") as $filename )
+		{
+			WP_CLI::warning('filename=' . $filename );
+
+			foreach ( $data AS $value => $replacement ) {
+				WP_CLI::debug( 'value=' . $value . ' => replace=' . $replacement );
+				$content = file_get_contents($filename);
+
+				file_put_contents( $filename, str_replace( $value, $replacement, $content ) );
+			}
+		}
+
+	}
 
 	/**
 	 * Prompt to override existing assets.
