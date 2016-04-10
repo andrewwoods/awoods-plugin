@@ -33,7 +33,62 @@ class Awoods_Command extends WP_CLI_Command {
 		$this->list_users();
 		$this->list_roles();
 		$this->current_wpcli_version();
+		$this->get_search_engine_visibility();
 	}
+
+
+
+	/**
+	 * Search Engine Visibility
+	 *
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp awoods site-visible
+	 *
+	 * @subcommand site-visible
+	 *
+	 * @when before_wp_load
+	 */
+	function site_visible( $args, $assoc_args ) {
+		$this->get_search_engine_visibility();
+	}
+
+
+
+	/**
+	 * Determine the value of the 'blog_public' option.
+	 * It controls if search engines should crawl the site.
+	 *
+	 * @return void
+	 */
+	protected function get_search_engine_visibility() {
+		$args = array('option', 'get', 'blog_public');
+		$assoc_args = array(
+			'format' => 'json'
+		);
+
+		ob_start();
+		WP_CLI::run_command( $args, $assoc_args );
+		$json = ob_get_clean();
+
+		$json = json_decode( $json, true );
+
+		if ( $json ) {
+			$message = 'Site is public';
+		} else {
+			$message = 'Discouraged search engines from indexing this site';
+		}
+
+		self::heading( 'Search Engine Visibility' );
+		WP_CLI\Utils\format_items(
+			'table',
+			array( array( 'Blog Status' => $message ) ),
+			array( 'Blog Status' )
+		);
+
+	}
+
 
 
 	/**
