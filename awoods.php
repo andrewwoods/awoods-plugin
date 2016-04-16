@@ -1,15 +1,14 @@
 <?php
-/**
- * Plugin Name: AWoods Development 
- * Version: 0.1-alpha
- * Description: A Development plugin by awoods. It a tool to help with WordPress Development and Administroation. It integrates with WP-CLI.
- * Author: awoods
- * Author URI: http://andrewwoods.net
- * Plugin URI: https://github.com/andrewwoods/awoods-development
- * Text Domain: awoods
- * Domain Path: /languages
- * @package Awoods
- */
+/*
+Plugin Name: AWoods Development
+Version: 0.1-alpha
+Description: A Development plugin by awoods. It a tool to help with WordPress Development and Administroation. It integrates with WP-CLI.
+Author: awoods
+Author URI: http://andrewwoods.net
+Plugin URI: https://github.com/andrewwoods/awoods-development
+Text Domain: awoods
+Domain Path: /languages
+*/
 
 define( 'AWOODS_DIR_PATH', plugin_dir_path( __FILE__ ) ); 
 define( 'AWOODS_DIR_URL',  plugin_dir_url( __FILE__ ) ); 
