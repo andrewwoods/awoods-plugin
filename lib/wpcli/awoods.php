@@ -5,6 +5,7 @@
 class Awoods_Command extends WP_CLI_Command {
 
 
+
 	/**
 	 * Prints a summary of the current wordpress site.
 	 *
@@ -24,7 +25,7 @@ class Awoods_Command extends WP_CLI_Command {
 		$row = array();
 		$row['home'] = json_decode( $response->stdout );
 		$opts[] = $row;
-			
+
 		WP_CLI\Utils\format_items( 'table', $opts, array( 'home' ) );
 
 		$this->list_active_theme();
@@ -108,6 +109,7 @@ class Awoods_Command extends WP_CLI_Command {
 	}
 
 
+
 	/**
 	 * Display a list of the active plugins
 	 *
@@ -121,7 +123,7 @@ class Awoods_Command extends WP_CLI_Command {
 
 		self::heading( 'Active Plugins' );
 		WP_CLI::run_command( $args, $assoc_args );
-	} 
+	}
 
 
 
@@ -143,7 +145,6 @@ class Awoods_Command extends WP_CLI_Command {
 
 
 
-
 	/**
 	 * Display a liist of the active theme
 	 *
@@ -157,7 +158,8 @@ class Awoods_Command extends WP_CLI_Command {
 
 		self::heading( "Active Theme" );
 		WP_CLI::run_command( $args, $assoc_args );
-	} 
+	}
+
 
 
 	/**
@@ -173,7 +175,7 @@ class Awoods_Command extends WP_CLI_Command {
 
 		self::heading( "Current Users" );
 		WP_CLI::run_command( $args, $assoc_args );
-	} 
+	}
 
 
 
@@ -188,7 +190,8 @@ class Awoods_Command extends WP_CLI_Command {
 
 		self::heading( "Menus" );
 		WP_CLI::run_command( $args, $assoc_args );
-	} 
+	}
+
 
 
 	/**
@@ -217,9 +220,6 @@ class Awoods_Command extends WP_CLI_Command {
 	 * [--author_uri=<url>]
 	 * : What to put in the 'Author URI:' header in style.css
 	 *
-	 * [--force]
-	 * : Overwrite files that already exist.
-	 *
 	 * ## EXAMPLES
 	 *
 	 *     wp awoods temperance <slug>
@@ -233,29 +233,27 @@ class Awoods_Command extends WP_CLI_Command {
 		// gets redirected to here
 		$gh_url='https://codeload.github.com/andrewwoods/temperance/zip/master';
 
-		WP_CLI::debug( "gh_url=$gh_url" );
-
 		$theme_path = WP_CONTENT_DIR . "/themes";
 		$url        = $gh_url;
 		$timeout    = 30;
 		$data = wp_parse_args( $assoc_args, array(
 			'theme_name'  => ucfirst( $theme_slug ),
-			'theme_uri'   => 'http://theme-site.example.com',
+			'theme_uri'   => 'http://THEME-URI.example.com',
 			'author_name' => 'Firstname Lastname',
-			'author_uri'  => 'http://author-site.example.com',
+			'author_uri'  => 'http://AUTHOR-URI.example.com',
+			'activate'    => false,
+			'enable-network'=> false,
 		) );
 
-		$data['description'] = $data['theme_name'] . ", developed by " . $data['author'];
+		$data['description'] = $data['theme_name'] . ", developed by " . $data['author_name'];
 		$data['slug']        = $theme_slug;
-		$data['text_domain'] = $slug . 'theme';
-		$data['prefix']      = $slug . '_';
+		$data['text_domain'] = $theme_slug;
+		$data['prefix']      = $theme_slug . '_';
 
 
 		$new_theme_path = "$theme_path/$theme_slug";
-		WP_CLI::debug( "new_theme_path=$new_theme_path" );
 
 		$temperance_master_path = "$theme_path/temperance-master";
-		WP_CLI::debug( "temperance_master_path=$temperance_master_path" );
 
 		$force = \WP_CLI\Utils\get_flag_value( $data, 'force' );
 		$should_write_file = $this->prompt_if_files_will_be_overwritten( $new_theme_path, $force );
@@ -266,10 +264,7 @@ class Awoods_Command extends WP_CLI_Command {
 		}
 
 
-
-
 		$tmpfname = wp_tempnam( $url . '.zip' );
-		WP_CLI::debug('tmpfname=' . $tmpfname);
 		$response = wp_remote_post( $url, array(
 			'timeout'  => $timeout,
 			'stream'   => true,
@@ -303,16 +298,19 @@ class Awoods_Command extends WP_CLI_Command {
 		WP_CLI::debug( print_r( $data, true) );
 
 		$replacements = array();
-		$replacements['temperance']                      = $data['slug'];
 		$replacements['temperancetheme']                 = $data['text_domain'];
 		$replacements['YOUR_THEME_NAME']                 = $data['theme_name'];
+		$replacements['Temperance']                      = $data['theme_name'];
 		$replacements['AUTHOR_NAME']                     = $data['author_name'];
 		$replacements['http://AUTHOR-URI.example.com/']  = $data['author_uri'];
 		$replacements['http://THEME-URI.example.com/']   = $data['theme_uri'];
+		$replacements['temperance']                      = $data['slug'];
 
-		WP_CLI::warning('About to Search and Replace');
+		WP_CLI::warning('About to Rename Files');
+		$this->rename_files( $new_theme_path, 'temperance', $data['slug'] );
+
+		WP_CLI::warning("About to Search and Replace");
 		$this->search_replace_text( $new_theme_path, $replacements );
-
 
 		if ( \WP_CLI\Utils\get_flag_value( $assoc_args, 'activate' ) ) {
 			WP_CLI::run_command( array( 'theme', 'activate', $theme_slug ) );
@@ -322,6 +320,8 @@ class Awoods_Command extends WP_CLI_Command {
 
 	}
 
+
+
 	/**
 	 * Search/Replace multiple text in files within the folder
 	 *
@@ -330,27 +330,76 @@ class Awoods_Command extends WP_CLI_Command {
 	 * @return void
 	 */
 	protected function search_replace_text( $dir_path, $data ) {
-		WP_CLI::debug('dir_path=' . $dir_path );
-		WP_CLI::debug('data=' . print_r( $data, true ) );
 
-		// Find all the files in the directory
-		$glob_path = $dir_path . '/*.*';
+		$files = $this->get_files( $dir_path );
+		foreach ( $files as $filename ) {
 
-		WP_CLI::debug('glob path=' . $glob_path );
+			// skip things that aren't files
+			if ( in_array( basename( $filename ), array( '.', '..' ) )  ) {
+				continue;
+			}
 
-		foreach ( glob("$glob_path") as $filename )
-		{
-			WP_CLI::warning('filename=' . $filename );
+			if ( ! is_file( $filename ) ) {
+				continue;
+			}
 
 			foreach ( $data AS $value => $replacement ) {
-				WP_CLI::debug( 'value=' . $value . ' => replace=' . $replacement );
-				$content = file_get_contents($filename);
+				$content = file_get_contents( $filename );
 
 				file_put_contents( $filename, str_replace( $value, $replacement, $content ) );
 			}
 		}
-
 	}
+
+
+
+	/**
+	 * Search/Replace multiple text in files within the folder
+	 *
+	 * @param string $dir_path
+	 * @param array $data
+	 * @return void
+	 */
+	protected function rename_files( $dir_path, $old_slug, $new_slug ) {
+
+		$files = $this->get_files( $dir_path );
+		foreach ( $files as $file ) {
+
+			// look only for filenames that have the slug that we want to change
+			if ( false !== strpos( $file, $old_slug ) ) {
+				$new_file = str_replace( $old_slug, $new_slug, $file );
+
+
+				$success = rename( $file, $new_file );
+				if ( ! $success ) {
+					WP_CLI::error( "Could not rename $file to $new_file" );
+				} else {
+					WP_CLI::success('file renamed to ' . $new_file );
+				}
+			}
+		}
+	}
+
+
+
+	/**
+	 * Retrieve a list of files and subdirectories under $path
+	 *
+	 * @param string $path a directory path
+	 * @return array
+	 */
+	protected function get_files( $path ) {
+		$dir_iterator = new RecursiveDirectoryIterator( $path );
+		$iterator = new RecursiveIteratorIterator( $dir_iterator, RecursiveIteratorIterator::SELF_FIRST );
+		$files = array();
+		foreach ($iterator as $file) {
+			$files[] = $file;
+		}
+
+		return $files;
+	}
+
+
 
 	/**
 	 * Prompt to override existing assets.
@@ -364,6 +413,7 @@ class Awoods_Command extends WP_CLI_Command {
 		if ( ! file_exists( $filename ) ) {
 			return true;
 		}
+
 		WP_CLI::warning( 'File already exists' );
 		WP_CLI::log( $filename );
 		if ( ! $force ) {
@@ -395,7 +445,8 @@ class Awoods_Command extends WP_CLI_Command {
 		self::heading( "WordPress Version: " );
 		WP_CLI::run_command( $args, $assoc_args );
 		echo "\n";
-	} 
+	}
+
 
 
 	/**
@@ -410,7 +461,9 @@ class Awoods_Command extends WP_CLI_Command {
 		self::heading( 'WP-CLI information' );
 		WP_CLI::run_command( $args, $assoc_args );
 		echo "\n";
-	} 
+	}
+
+
 
 	/**
 	 * Create the themes directory if it doesn't already exist
@@ -423,6 +476,7 @@ class Awoods_Command extends WP_CLI_Command {
 	}
 
 
+
 	/**
 	 * Initialize WP Filesystem
 	 */
@@ -431,7 +485,6 @@ class Awoods_Command extends WP_CLI_Command {
 		WP_Filesystem();
 		return $wp_filesystem;
 	}
-
 
 
 
@@ -447,16 +500,20 @@ class Awoods_Command extends WP_CLI_Command {
 		self::heading( 'Current Roles' );
 		WP_CLI::run_command( $args, $assoc_args );
 		echo "\n";
-	} 
+	}
 
 
+	/**
+	 * @param string $heading Display a formatted heading
+	 * @return void
+	 */
 	static public function heading($heading) {
 		$heading = strtoupper( $heading );
 
 		echo "\n";
 		echo "\n";
 		WP_CLI::line( $heading );
-	} 
+	}
 
 }
 
